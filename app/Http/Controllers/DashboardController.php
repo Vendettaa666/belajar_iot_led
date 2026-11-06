@@ -12,14 +12,12 @@ class DashboardController extends Controller
     // Menampilkan halaman dashboard
     public function index()
     {
-        // Ambil device pertama (asumsi 1 ESP8266 untuk praktikum ini)
-        // Nanti bisa disesuaikan dengan auth()->user()->devices jika sudah ada login
+        // Ambil device pertama beserta data leds-nya
         $device = Device::with('leds')->firstOrFail();
 
         return view('dashboard', compact('device'));
     }
-
-    // Menangani permintaan toggle LED dari frontend
+        // Menangani permintaan toggle LED dari frontend
     public function toggleLed(Request $request, $ledId)
     {
         $request->validate([

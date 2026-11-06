@@ -79,11 +79,11 @@
         </div>
 
         <!-- Footer / Info -->
+        <!-- Ubah bagian footer ini -->
         <div class="mt-8 text-center text-gray-500 text-sm">
             <p>Workshop Pemrograman Dasar - Politeknik Negeri Jember</p>
-            <p class="text-xs mt-1">Pastikan ESP8266 terhubung ke WiFi yang sama dengan server Laravel.</p>
+            <p class="text-xs mt-1">Pastikan ESP8266 terhubung ke internet untuk sinkronisasi real-time.</p>
         </div>
-
     </div>
 
     <script>
