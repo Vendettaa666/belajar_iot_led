@@ -21,7 +21,7 @@
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen"
-      x-data="iotDashboard(@json($device), @json($recentLogs), @json($stats))"
+      x-data='iotDashboard(@json($device), @json($recentLogs), @json($stats))'
       x-init="startAutoRefresh()">
 
     <div class="flex flex-col md:flex-row min-h-screen">
