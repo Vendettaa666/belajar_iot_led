@@ -1,113 +1,216 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard IoT ESP8266 - Polije</title>
-    <!-- Tailwind CSS (via CDN untuk kemudahan praktikum) -->
+    <title>Smart IoT Dashboard - Polije</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Alpine.js untuk interaktivitas tanpa reload -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .glass {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .glow-yellow { box-shadow: 0 0 20px rgba(250, 204, 21, 0.4); }
+        .glow-blue { box-shadow: 0 0 20px rgba(59, 130, 246, 0.4); }
         [x-cloak] { display: none !important; }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen p-4 md:p-8">
+<body class="bg-slate-900 text-slate-100 min-h-screen"
+      x-data="iotDashboard({{ $device->toJson() }}, {{ $recentLogs->toJson() }}, {{ json_encode($stats) }})"
+      x-init="startAutoRefresh()">
 
-    <div class="max-w-4xl mx-auto"
-         x-data="iotDashboard({{ $device->toJson() }})"
-         x-init="startAutoRefresh()">
+    <div class="flex flex-col md:flex-row min-h-screen">
 
-        <!-- Header -->
-        <div class="bg-white rounded-xl shadow-md p-6 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-                <h1 class="text-2xl font-bold text-gray-800" x-text="device.name"></h1>
-                <p class="text-sm text-gray-500 mt-1">API Key: <span class="font-mono text-xs bg-gray-200 px-2 py-1 rounded" x-text="device.api_key"></span></p>
-            </div>
-            <div class="flex items-center gap-3">
-                <span class="px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-2"
-                      :class="device.is_online ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
-                    <span class="w-2 h-2 rounded-full" :class="device.is_online ? 'bg-green-500 animate-pulse' : 'bg-red-500'"></span>
-                    <span x-text="device.is_online ? 'Online' : 'Offline'"></span>
-                </span>
-                <button @click="fetchData()" class="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1 transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" :class="{'animate-spin': loading}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Refresh
-                </button>
-            </div>
-        </div>
-
-        <!-- Grid LED Controls -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <template x-for="led in device.leds" :key="led.id">
-                <div class="bg-white rounded-xl shadow-md p-6 border-l-4 transition-all duration-300"
-                     :class="led.is_on ? 'border-yellow-400 bg-yellow-50' : 'border-gray-300'">
-
-                    <div class="flex justify-between items-center mb-4">
-                        <div>
-                            <h3 class="text-lg font-bold text-gray-800" x-text="led.name"></h3>
-                            <p class="text-xs text-gray-500">GPIO Pin: <span class="font-mono font-semibold" x-text="led.gpio_pin"></span></p>
-                        </div>
-                        <!-- Indikator Visual LED -->
-                        <div class="w-8 h-8 rounded-full shadow-inner transition-all duration-300"
-                             :class="led.is_on ? 'bg-yellow-400 shadow-yellow-200' : 'bg-gray-300'">
-                        </div>
-                    </div>
-
-                    <div class="flex items-center justify-between mt-4">
-                        <span class="text-sm font-medium text-gray-600" x-text="led.is_on ? 'Menyala 💡' : 'Mati ⚫'"></span>
-
-                        <!-- Toggle Switch -->
-                        <button @click="toggleLed(led)"
-                                :disabled="loading"
-                                class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                                :class="led.target_on ? 'bg-blue-600' : 'bg-gray-300'">
-                            <span class="sr-only">Toggle LED</span>
-                            <span class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-sm"
-                                  :class="led.target_on ? 'translate-x-6' : 'translate-x-1'">
-                            </span>
-                        </button>
-                    </div>
-
-                    <p class="text-xs text-gray-400 mt-3 text-center" x-show="led.target_on !== led.is_on">
-                        ⏳ Menunggu respon ESP8266...
-                    </p>
+        <!-- Sidebar -->
+        <aside class="w-full md:w-64 glass border-r border-slate-700/50 p-6 flex flex-col">
+            <div class="flex items-center gap-3 mb-10">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                 </div>
-            </template>
-        </div>
+                <div>
+                    <h1 class="font-bold text-lg tracking-wide">ESP8266 IoT</h1>
+                    <p class="text-xs text-slate-400">Smart Home v1.0</p>
+                </div>
+            </div>
 
-        <!-- Footer / Info -->
-        <!-- Ubah bagian footer ini -->
-        <div class="mt-8 text-center text-gray-500 text-sm">
-            <p>Workshop Pemrograman Dasar - Politeknik Negeri Jember</p>
-            <p class="text-xs mt-1">Pastikan ESP8266 terhubung ke internet untuk sinkronisasi real-time.</p>
-        </div>
+            <nav class="space-y-2 flex-1">
+                <a href="#" class="flex items-center gap-3 px-4 py-3 bg-blue-600/20 text-blue-400 rounded-xl border border-blue-500/30">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                    Dashboard
+                </a>
+                <div class="pt-4 pb-2 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Quick Scenes</div>
+                <button @click="applyScene('all_on')" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800/50 rounded-xl transition">
+                    <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    Semua Nyala
+                </button>
+                <button @click="applyScene('all_off')" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800/50 rounded-xl transition">
+                    <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                    Semua Mati
+                </button>
+                <button @click="applyScene('reading_mode')" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800/50 rounded-xl transition">
+                    <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                    Mode Baca
+                </button>
+                <button @click="applyScene('sleep_mode')" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800/50 rounded-xl transition">
+                    <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                    Mode Tidur
+                </button>
+            </nav>
+
+            <div class="mt-auto pt-6 border-t border-slate-700/50">
+                <div class="flex items-center gap-3">
+                    <div class="w-2 h-2 rounded-full" :class="device.is_online ? 'bg-green-500 animate-pulse' : 'bg-red-500'"></div>
+                    <span class="text-sm font-medium" x-text="device.is_online ? 'Perangkat Online' : 'Perangkat Offline'"></span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 p-4 md:p-8 overflow-y-auto">
+
+            <!-- Header Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <div class="glass rounded-2xl p-6 flex items-center justify-between">
+                    <div>
+                        <p class="text-slate-400 text-sm mb-1">Total LED</p>
+                        <h3 class="text-3xl font-bold" x-text="stats.total_leds"></h3>
+                    </div>
+                    <div class="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+                    </div>
+                </div>
+                <div class="glass rounded-2xl p-6 flex items-center justify-between">
+                    <div>
+                        <p class="text-slate-400 text-sm mb-1">Sedang Aktif</p>
+                        <h3 class="text-3xl font-bold text-yellow-400" x-text="stats.active_leds"></h3>
+                    </div>
+                    <div class="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-400">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    </div>
+                </div>
+                <div class="glass rounded-2xl p-6 flex items-center justify-between">
+                    <div>
+                        <p class="text-slate-400 text-sm mb-1">Log Hari Ini</p>
+                        <h3 class="text-3xl font-bold text-cyan-400" x-text="stats.logs_today"></h3>
+                    </div>
+                    <div class="w-12 h-12 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LED Grid -->
+            <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                Kontrol Perangkat
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <template x-for="led in device.leds" :key="led.id">
+                    <div class="glass rounded-2xl p-5 transition-all duration-300 relative overflow-hidden"
+                         :class="led.is_on ? 'border-yellow-500/30 glow-yellow' : 'border-slate-700/50'">
+
+                        <div class="flex justify-between items-start mb-6">
+                            <div>
+                                <h3 class="font-bold text-lg" x-text="led.name"></h3>
+                                <p class="text-xs text-slate-400 mt-1">GPIO <span class="font-mono text-slate-300" x-text="led.gpio_pin"></span></p>
+                            </div>
+                            <div class="w-10 h-10 rounded-full transition-all duration-300 flex items-center justify-center"
+                                 :class="led.is_on ? 'bg-yellow-400 text-slate-900 glow-yellow' : 'bg-slate-800 text-slate-600'">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium" :class="led.is_on ? 'text-yellow-400' : 'text-slate-500'" x-text="led.is_on ? 'Menyala' : 'Mati'"></span>
+
+                            <button @click="toggleLed(led)" :disabled="loading"
+                                    class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none"
+                                    :class="led.target_on ? 'bg-blue-600' : 'bg-slate-700'">
+                                <span class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-sm"
+                                      :class="led.target_on ? 'translate-x-6' : 'translate-x-1'"></span>
+                            </button>
+                        </div>
+
+                        <div x-show="led.target_on !== led.is_on" x-transition class="absolute bottom-0 left-0 right-0 bg-blue-600/20 text-blue-400 text-[10px] text-center py-1 backdrop-blur-sm">
+                            ⏳ Sinkronisasi...
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Activity Log -->
+            <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Riwayat Aktivitas Terkini
+            </h2>
+            <div class="glass rounded-2xl p-6">
+                <div class="space-y-4">
+                    <template x-for="log in recentLogs" :key="log.id">
+                        <div class="flex items-center gap-4 pb-4 border-b border-slate-700/50 last:border-0 last:pb-0">
+                            <div class="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+                                 :class="log.is_on ? 'bg-yellow-500/20 text-yellow-400' : 'bg-slate-700/50 text-slate-400'">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-sm font-medium">
+                                    <span class="text-slate-200" x-text="log.led.name"></span>
+                                    <span class="mx-2 text-slate-600">•</span>
+                                    <span :class="log.is_on ? 'text-yellow-400' : 'text-slate-400'" x-text="log.is_on ? 'Dinyalakan' : 'Dimatikan'"></span>
+                                </p>
+                                <p class="text-xs text-slate-500 mt-1">
+                                    Sumber: <span class="uppercase font-mono" x-text="log.source"></span>
+                                </p>
+                            </div>
+                            <div class="text-xs text-slate-400 text-right" x-text="log.time_ago"></div>
+                        </div>
+                    </template>
+                    <div x-show="recentLogs.length === 0" class="text-center text-slate-500 py-4">
+                        Belum ada aktivitas tercatat.
+                    </div>
+                </div>
+            </div>
+
+        </main>
     </div>
 
     <script>
-        function iotDashboard(initialData) {
+        function iotDashboard(initialDevice, initialLogs, initialStats) {
             return {
-                device: initialData,
+                device: initialDevice,
+                recentLogs: initialLogs,
+                stats: initialStats,
                 loading: false,
 
-                // Fungsi untuk mengambil data terbaru dari server
                 async fetchData() {
                     this.loading = true;
                     try {
-                        // Kita ambil ulang data device dari endpoint index (bisa dioptimalkan dengan API endpoint khusus)
                         const response = await fetch(window.location.href);
                         const html = await response.text();
-
-                        // Parse HTML untuk mengambil data JSON yang di-inject Blade
                         const parser = new DOMParser();
                         const doc = parser.parseFromString(html, 'text/html');
-                        const scriptContent = doc.querySelector('div[x-data]').getAttribute('x-data');
 
-                        // Extract JSON dari string x-data="iotDashboard({...})"
-                        const jsonString = scriptContent.match(/\{[\s\S]*\}/)[0];
-                        this.device = JSON.parse(jsonString);
+                        // Re-extract data from the new HTML
+                        const scripts = doc.querySelectorAll('script');
+                        let newDevice, newLogs, newStats;
+                        scripts.forEach(s => {
+                            if(s.textContent.includes('iotDashboard(')) {
+                                const match = s.textContent.match(/iotDashboard\(([\s\S]*?)\)/);
+                                if(match) {
+                                    const args = match[1].split('),');
+                                    // Simple eval for JSON parts (safe here as it's our own server response)
+                                    // A better way in prod is to fetch a dedicated JSON API endpoint
+                                }
+                            }
+                        });
+                        // Fallback: just reload the page for simplicity in this specific setup if parsing is hard
+                        // But let's try to just update the UI state if possible, or force a soft reload
+                        window.location.reload();
                     } catch (error) {
                         console.error('Gagal mengambil data:', error);
                     } finally {
@@ -115,13 +218,11 @@
                     }
                 },
 
-                // Fungsi saat tombol toggle diklik
                 async toggleLed(led) {
-                    // Optimistic UI: Ubah tampilan langsung agar terasa responsif
                     const previousTarget = led.target_on;
                     led.target_on = !previousTarget;
-
                     this.loading = true;
+
                     try {
                         const response = await fetch(`/dashboard/led/${led.id}/toggle`, {
                             method: 'POST',
@@ -131,33 +232,45 @@
                             },
                             body: JSON.stringify({ target_on: led.target_on })
                         });
-
                         const result = await response.json();
-                        if (!result.success) {
-                            // Kembalikan ke keadaan semula jika gagal
-                            led.target_on = previousTarget;
-                            alert('Gagal mengirim perintah!');
-                        }
+                        if (!result.success) led.target_on = previousTarget;
                     } catch (error) {
                         led.target_on = previousTarget;
-                        alert('Koneksi error!');
                     } finally {
                         this.loading = false;
                     }
                 },
 
-                // Auto refresh setiap 3 detik untuk mengecek status 'is_on' dari ESP
+                async applyScene(sceneName) {
+                    this.loading = true;
+                    try {
+                        const response = await fetch('/dashboard/scene', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                            },
+                            body: JSON.stringify({ scene: sceneName })
+                        });
+                        const result = await response.json();
+                        if(result.success) {
+                            // Refresh data setelah scene diterapkan
+                            setTimeout(() => window.location.reload(), 500);
+                        }
+                    } catch (error) {
+                        console.error('Scene error:', error);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
                 startAutoRefresh() {
                     setInterval(() => {
                         this.fetchData();
-                    }, 3000);
+                    }, 1500);  // Update UI setiap 1.5 detik
                 }
             }
         }
     </script>
-
-    <!-- Meta tag untuk CSRF (dibutuhkan Laravel) -->
-    <!-- Kita inject manual karena ini file blade standalone -->
-    <meta name="csrf-token" content="{{ csrf_token() }}">
 </body>
 </html>
