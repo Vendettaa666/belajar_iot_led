@@ -17,16 +17,14 @@
             border: 1px solid rgba(255, 255, 255, 0.05);
         }
         .glow-yellow { box-shadow: 0 0 20px rgba(250, 204, 21, 0.4); }
-        .glow-blue { box-shadow: 0 0 20px rgba(59, 130, 246, 0.4); }
         [x-cloak] { display: none !important; }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen"
-      x-data="iotDashboard({{ $device->toJson() }}, {{ $recentLogs->toJson() }}, {{ json_encode($stats) }})"
+      x-data="iotDashboard(@json($device), @json($recentLogs), @json($stats))"
       x-init="startAutoRefresh()">
 
     <div class="flex flex-col md:flex-row min-h-screen">
-
         <!-- Sidebar -->
         <aside class="w-full md:w-64 glass border-r border-slate-700/50 p-6 flex flex-col">
             <div class="flex items-center gap-3 mb-10">
@@ -35,15 +33,11 @@
                 </div>
                 <div>
                     <h1 class="font-bold text-lg tracking-wide">ESP8266 IoT</h1>
-                    <p class="text-xs text-slate-400">Smart Home v1.0</p>
+                    <p class="text-xs text-slate-400">Smart Home v2.0</p>
                 </div>
             </div>
 
             <nav class="space-y-2 flex-1">
-                <a href="#" class="flex items-center gap-3 px-4 py-3 bg-blue-600/20 text-blue-400 rounded-xl border border-blue-500/30">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
-                    Dashboard
-                </a>
                 <div class="pt-4 pb-2 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Quick Scenes</div>
                 <button @click="applyScene('all_on')" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800/50 rounded-xl transition">
                     <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
@@ -73,7 +67,6 @@
 
         <!-- Main Content -->
         <main class="flex-1 p-4 md:p-8 overflow-y-auto">
-
             <!-- Header Stats -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                 <div class="glass rounded-2xl p-6 flex items-center justify-between">
@@ -170,12 +163,8 @@
                             <div class="text-xs text-slate-400 text-right" x-text="log.time_ago"></div>
                         </div>
                     </template>
-                    <div x-show="recentLogs.length === 0" class="text-center text-slate-500 py-4">
-                        Belum ada aktivitas tercatat.
-                    </div>
                 </div>
             </div>
-
         </main>
     </div>
 
@@ -187,34 +176,17 @@
                 stats: initialStats,
                 loading: false,
 
+                // FUNGSI AJAX BARU: Update tanpa reload halaman
                 async fetchData() {
-                    this.loading = true;
                     try {
-                        const response = await fetch(window.location.href);
-                        const html = await response.text();
-                        const parser = new DOMParser();
-                        const doc = parser.parseFromString(html, 'text/html');
+                        const response = await fetch('{{ route("dashboard.data") }}');
+                        const data = await response.json();
 
-                        // Re-extract data from the new HTML
-                        const scripts = doc.querySelectorAll('script');
-                        let newDevice, newLogs, newStats;
-                        scripts.forEach(s => {
-                            if(s.textContent.includes('iotDashboard(')) {
-                                const match = s.textContent.match(/iotDashboard\(([\s\S]*?)\)/);
-                                if(match) {
-                                    const args = match[1].split('),');
-                                    // Simple eval for JSON parts (safe here as it's our own server response)
-                                    // A better way in prod is to fetch a dedicated JSON API endpoint
-                                }
-                            }
-                        });
-                        // Fallback: just reload the page for simplicity in this specific setup if parsing is hard
-                        // But let's try to just update the UI state if possible, or force a soft reload
-                        window.location.reload();
+                        this.device = data.device;
+                        this.stats = data.stats;
+                        this.recentLogs = data.recentLogs;
                     } catch (error) {
-                        console.error('Gagal mengambil data:', error);
-                    } finally {
-                        this.loading = false;
+                        console.error('Gagal update data:', error);
                     }
                 },
 
@@ -254,8 +226,8 @@
                         });
                         const result = await response.json();
                         if(result.success) {
-                            // Refresh data setelah scene diterapkan
-                            setTimeout(() => window.location.reload(), 500);
+                            // Langsung update data setelah scene diterapkan
+                            await this.fetchData();
                         }
                     } catch (error) {
                         console.error('Scene error:', error);
@@ -265,9 +237,10 @@
                 },
 
                 startAutoRefresh() {
+                    // Update UI setiap 1.5 detik secara mulus (tanpa reload)
                     setInterval(() => {
                         this.fetchData();
-                    }, 1500);  // Update UI setiap 1.5 detik
+                    }, 1500);
                 }
             }
         }
