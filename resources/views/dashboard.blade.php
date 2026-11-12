@@ -144,18 +144,28 @@
     function sensorDashboard(apiKey) {
         return {
             apiKey: apiKey,
-            latestTemp: '--', latestHum: '--',
-            minTemp: '--', maxTemp: '--', avgTemp: '--',
-            minHum: '--', maxHum: '--', avgHum: '--',
-            isOnline: false, lastUpdate: 'Menunggu data...',
+            latestTemp: '--',
+            latestHum: '--',
+            minTemp: '--',
+            maxTemp: '--',
+            avgTemp: '--',
+            minHum: '--',
+            maxHum: '--',
+            avgHum: '--',
+            isOnline: false,
+            lastUpdate: 'Menunggu data...',
             chart: null,
-            chartData: { labels: [], temp: [], hum: [] },
+            chartData: {
+                labels: [],
+                temp: [],
+                hum: []
+            },
 
             async init() {
-                // HANYA buat chart sekali saat init
+                // Tunggu DOM ready
+                await this.$nextTick();
                 this.initChart();
                 await this.fetchData();
-                // Update setiap 10 detik
                 setInterval(() => this.fetchData(), 10000);
             },
 
@@ -178,8 +188,12 @@
                         this.latestHum = data.latest.humidity;
                         this.lastUpdate = 'Update: ' + data.latest.time;
 
-                        // Type checking yang lebih ketat
-                        this.isOnline = Boolean(data.is_online);
+                        // Cek status online dengan multiple conditions
+                        if (data.is_online === true || data.is_online === 1 || data.is_online === '1') {
+                            this.isOnline = true;
+                        } else {
+                            this.isOnline = false;
+                        }
 
                         // Tambah data ke chart
                         this.chartData.labels.push(data.latest.time);
@@ -209,17 +223,22 @@
 
             calculateStats() {
                 if (this.chartData.temp.length === 0) return;
-                const t = this.chartData.temp, h = this.chartData.hum;
+                const t = this.chartData.temp;
+                const h = this.chartData.hum;
+
                 this.minTemp = Math.min(...t).toFixed(1);
                 this.maxTemp = Math.max(...t).toFixed(1);
                 this.avgTemp = (t.reduce((a, b) => a + b, 0) / t.length).toFixed(1);
+
                 this.minHum = Math.min(...h).toFixed(1);
                 this.maxHum = Math.max(...h).toFixed(1);
                 this.avgHum = (h.reduce((a, b) => a + b, 0) / h.length).toFixed(1);
             },
 
             getComfortStatus() {
-                const t = parseFloat(this.latestTemp), h = parseFloat(this.latestHum);
+                const t = parseFloat(this.latestTemp);
+                const h = parseFloat(this.latestHum);
+
                 if (isNaN(t) || isNaN(h)) return 'Menunggu data dari sensor...';
                 if (t >= 20 && t <= 26 && h >= 40 && h <= 60) return '✅ Nyaman - Kondisi ideal ruangan.';
                 if (t > 26) return '🌡️ Terlalu panas - Pertimbangkan untuk menyalakan kipas/AC.';
@@ -229,21 +248,28 @@
             },
 
             initChart() {
-                // Hancurkan chart lama jika ada (PENTING!)
+                const ctx = document.getElementById('sensorChart');
+                if (!ctx) {
+                    console.error('Canvas element not found');
+                    return;
+                }
+
+                // Hancurkan chart lama jika ada
                 if (this.chart) {
                     this.chart.destroy();
                     this.chart = null;
                 }
 
-                const ctx = document.getElementById('sensorChart').getContext('2d');
-                this.chart = new Chart(ctx, {
+                const context = ctx.getContext('2d');
+
+                this.chart = new Chart(context, {
                     type: 'line',
                     data: {
-                        labels: [],
+                        labels: this.chartData.labels,
                         datasets: [
                             {
                                 label: 'Suhu (°C)',
-                                data: [],
+                                data: this.chartData.temp,
                                 borderColor: '#f87171',
                                 backgroundColor: 'rgba(248, 113, 113, 0.1)',
                                 borderWidth: 2,
@@ -253,7 +279,7 @@
                             },
                             {
                                 label: 'Kelembapan (%)',
-                                data: [],
+                                data: this.chartData.hum,
                                 borderColor: '#60a5fa',
                                 backgroundColor: 'rgba(96, 165, 250, 0.1)',
                                 borderWidth: 2,
@@ -266,30 +292,58 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        interaction: { mode: 'index', intersect: false },
+                        interaction: {
+                            mode: 'index',
+                            intersect: false
+                        },
                         plugins: {
-                            legend: { labels: { color: '#94a3b8' } }
+                            legend: {
+                                labels: {
+                                    color: '#94a3b8'
+                                }
+                            }
                         },
                         scales: {
                             x: {
-                                ticks: { color: '#64748b', maxTicksLimit: 10 },
-                                grid: { color: 'rgba(148, 163, 184, 0.1)' }
+                                ticks: {
+                                    color: '#64748b',
+                                    maxTicksLimit: 10
+                                },
+                                grid: {
+                                    color: 'rgba(148, 163, 184, 0.1)'
+                                }
                             },
                             y: {
                                 type: 'linear',
                                 display: true,
                                 position: 'left',
-                                title: { display: true, text: 'Suhu (°C)', color: '#f87171' },
-                                ticks: { color: '#f87171' },
-                                grid: { color: 'rgba(148, 163, 184, 0.1)' }
+                                title: {
+                                    display: true,
+                                    text: 'Suhu (°C)',
+                                    color: '#f87171'
+                                },
+                                ticks: {
+                                    color: '#f87171'
+                                },
+                                grid: {
+                                    color: 'rgba(148, 163, 184, 0.1)'
+                                }
                             },
                             y1: {
                                 type: 'linear',
                                 display: true,
                                 position: 'right',
-                                title: { display: true, text: 'Kelembapan (%)', color: '#60a5fa' },
-                                ticks: { color: '#60a5fa' },
-                                grid: { drawOnChartArea: false }
+                                title: {
+                                    display: true,
+                                    text: 'Kelembapan (%)',
+                                    color: '#60a5fa'
+                                },
+                                ticks: {
+                                    color: '#60a5fa'
+                                },
+                                grid: {
+                                    drawOnChartArea: false
+                                }
                             }
                         }
                     }
@@ -297,12 +351,21 @@
             },
 
             updateChart() {
-                if (this.chart) {
-                    this.chart.data.labels = [...this.chartData.labels];
-                    this.chart.data.datasets[0].data = [...this.chartData.temp];
-                    this.chart.data.datasets[1].data = [...this.chartData.hum];
-                    this.chart.update('none'); // 'none' untuk animasi lebih cepat
+                if (!this.chart) {
+                    console.log('Chart belum diinisialisasi');
+                    return;
+                }
+
+                try {
+                    this.chart.data.labels = this.chartData.labels.slice();
+                    this.chart.data.datasets[0].data = this.chartData.temp.slice();
+                    this.chart.data.datasets[1].data = this.chartData.hum.slice();
+                    this.chart.update();
                     console.log('Chart updated:', this.chartData.labels.length, 'data points');
+                } catch (error) {
+                    console.error('Error updating chart:', error);
+                    // Jika gagal, re-init chart
+                    this.initChart();
                 }
             }
         }
