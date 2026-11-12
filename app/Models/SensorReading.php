@@ -6,10 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class SensorReading extends Model
 {
-    public $timestamps = false;
-
     protected $guarded = [];
-    const UPDATED_AT = null; 
+
+    // Tabel ini hanya mencatat waktu dibuat, tidak ada updated_at
+    const UPDATED_AT = null;
 
     protected $casts = [
         'temperature' => 'float',
