@@ -140,204 +140,174 @@
             </div>
         </main>
     </div>
-
     <script>
-        function sensorDashboard(apiKey) {
-            return {
-                apiKey: apiKey, // Simpan API key di state
-                latestTemp: '--',
-                latestHum: '--',
-                minTemp: '--',
-                maxTemp: '--',
-                avgTemp: '--',
-                minHum: '--',
-                maxHum: '--',
-                avgHum: '--',
-                isOnline: false,
-                lastUpdate: 'Menunggu data...',
-                chart: null,
-                chartData: {
-                    labels: [],
-                    temp: [],
-                    hum: []
-                },
+    function sensorDashboard(apiKey) {
+        return {
+            apiKey: apiKey,
+            latestTemp: '--', latestHum: '--',
+            minTemp: '--', maxTemp: '--', avgTemp: '--',
+            minHum: '--', maxHum: '--', avgHum: '--',
+            isOnline: false, lastUpdate: 'Menunggu data...',
+            chart: null,
+            chartData: { labels: [], temp: [], hum: [] },
 
-                async init() {
-                    this.initChart();
-                    await this.fetchData();
-                    // Update setiap 10 detik
-                    setInterval(() => this.fetchData(), 10000);
-                },
+            async init() {
+                // HANYA buat chart sekali saat init
+                this.initChart();
+                await this.fetchData();
+                // Update setiap 10 detik
+                setInterval(() => this.fetchData(), 10000);
+            },
 
-                async fetchData() {
-                    try {
-                        // Pastikan URL benar dan menggunakan API key
-                        const url = `/api/esp/sensor/latest?api_key=${this.apiKey}`;
-                        const response = await fetch(url);
+            async fetchData() {
+                try {
+                    const url = `/api/esp/sensor/latest?api_key=${this.apiKey}`;
+                    const response = await fetch(url);
 
-                        // Cek jika response error (misal 401 Unauthorized)
-                        if (!response.ok) {
-                            console.error('API Error:', response.status);
-                            this.isOnline = false;
-                            return;
-                        }
-
-                        const data = await response.json();
-
-                        // Log untuk debugging (bisa dilihat di Console browser)
-                        console.log('Data diterima dari server:', data);
-
-                        if (data.latest) {
-                            this.latestTemp = data.latest.temperature;
-                            this.latestHum = data.latest.humidity;
-                            this.lastUpdate = 'Update: ' + data.latest.time;
-
-                            // PENTING: Paksa konversi ke boolean
-                            this.isOnline = (data.is_online === true);
-
-                            this.chartData.labels.push(data.latest.time);
-                            this.chartData.temp.push(data.latest.temperature);
-                            this.chartData.hum.push(data.latest.humidity);
-
-                            if (this.chartData.labels.length > 20) {
-                                this.chartData.labels.shift();
-                                this.chartData.temp.shift();
-                                this.chartData.hum.shift();
-                            }
-                            this.calculateStats();
-                            this.updateChart();
-                        } else {
-                            this.isOnline = false;
-                        }
-                    } catch (error) {
-                        console.error('Gagal fetch data:', error);
+                    if (!response.ok) {
+                        console.error('API Error:', response.status);
                         this.isOnline = false;
+                        return;
                     }
-                },
 
-                calculateStats() {
-                    if (this.chartData.temp.length === 0) return;
-                    const t = this.chartData.temp,
-                        h = this.chartData.hum;
-                    this.minTemp = Math.min(...t).toFixed(1);
-                    this.maxTemp = Math.max(...t).toFixed(1);
-                    this.avgTemp = (t.reduce((a, b) => a + b, 0) / t.length).toFixed(1);
-                    this.minHum = Math.min(...h).toFixed(1);
-                    this.maxHum = Math.max(...h).toFixed(1);
-                    this.avgHum = (h.reduce((a, b) => a + b, 0) / h.length).toFixed(1);
-                },
+                    const data = await response.json();
+                    console.log('Data dari server:', data);
 
-                getComfortStatus() {
-                    const t = parseFloat(this.latestTemp),
-                        h = parseFloat(this.latestHum);
-                    if (isNaN(t) || isNaN(h)) return 'Menunggu data dari sensor...';
-                    if (t >= 20 && t <= 26 && h >= 40 && h <= 60) return '✅ Nyaman - Kondisi ideal ruangan.';
-                    if (t > 26) return '🌡️ Terlalu panas - Pertimbangkan untuk menyalakan kipas/AC.';
-                    if (t < 20) return '❄️ Terlalu dingin.';
-                    if (h > 60) return '💧 Terlalu lembap - Risiko tumbuhnya jamur.';
-                    return '🌬️ Udara terlalu kering.';
-                },
+                    if (data.latest) {
+                        this.latestTemp = data.latest.temperature;
+                        this.latestHum = data.latest.humidity;
+                        this.lastUpdate = 'Update: ' + data.latest.time;
 
-                initChart() {
-                    const ctx = document.getElementById('sensorChart').getContext('2d');
-                    this.chart = new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: [],
-                            datasets: [{
-                                    label: 'Suhu (°C)',
-                                    data: [],
-                                    borderColor: '#f87171',
-                                    backgroundColor: 'rgba(248, 113, 113, 0.1)',
-                                    borderWidth: 2,
-                                    tension: 0.4,
-                                    fill: true,
-                                    yAxisID: 'y'
-                                },
-                                {
-                                    label: 'Kelembapan (%)',
-                                    data: [],
-                                    borderColor: '#60a5fa',
-                                    backgroundColor: 'rgba(96, 165, 250, 0.1)',
-                                    borderWidth: 2,
-                                    tension: 0.4,
-                                    fill: true,
-                                    yAxisID: 'y1'
-                                }
-                            ]
+                        // Type checking yang lebih ketat
+                        this.isOnline = Boolean(data.is_online);
+
+                        // Tambah data ke chart
+                        this.chartData.labels.push(data.latest.time);
+                        this.chartData.temp.push(parseFloat(data.latest.temperature));
+                        this.chartData.hum.push(parseFloat(data.latest.humidity));
+
+                        // Batasi 20 data
+                        if (this.chartData.labels.length > 20) {
+                            this.chartData.labels.shift();
+                            this.chartData.temp.shift();
+                            this.chartData.hum.shift();
+                        }
+
+                        this.calculateStats();
+                        this.updateChart();
+
+                        console.log('Status online:', this.isOnline);
+                    } else {
+                        this.isOnline = false;
+                        console.log('Tidak ada data latest');
+                    }
+                } catch (error) {
+                    console.error('Gagal fetch data:', error);
+                    this.isOnline = false;
+                }
+            },
+
+            calculateStats() {
+                if (this.chartData.temp.length === 0) return;
+                const t = this.chartData.temp, h = this.chartData.hum;
+                this.minTemp = Math.min(...t).toFixed(1);
+                this.maxTemp = Math.max(...t).toFixed(1);
+                this.avgTemp = (t.reduce((a, b) => a + b, 0) / t.length).toFixed(1);
+                this.minHum = Math.min(...h).toFixed(1);
+                this.maxHum = Math.max(...h).toFixed(1);
+                this.avgHum = (h.reduce((a, b) => a + b, 0) / h.length).toFixed(1);
+            },
+
+            getComfortStatus() {
+                const t = parseFloat(this.latestTemp), h = parseFloat(this.latestHum);
+                if (isNaN(t) || isNaN(h)) return 'Menunggu data dari sensor...';
+                if (t >= 20 && t <= 26 && h >= 40 && h <= 60) return '✅ Nyaman - Kondisi ideal ruangan.';
+                if (t > 26) return '🌡️ Terlalu panas - Pertimbangkan untuk menyalakan kipas/AC.';
+                if (t < 20) return '❄️ Terlalu dingin.';
+                if (h > 60) return '💧 Terlalu lembap - Risiko tumbuhnya jamur.';
+                return '🌬️ Udara terlalu kering.';
+            },
+
+            initChart() {
+                // Hancurkan chart lama jika ada (PENTING!)
+                if (this.chart) {
+                    this.chart.destroy();
+                    this.chart = null;
+                }
+
+                const ctx = document.getElementById('sensorChart').getContext('2d');
+                this.chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [
+                            {
+                                label: 'Suhu (°C)',
+                                data: [],
+                                borderColor: '#f87171',
+                                backgroundColor: 'rgba(248, 113, 113, 0.1)',
+                                borderWidth: 2,
+                                tension: 0.4,
+                                fill: true,
+                                yAxisID: 'y'
+                            },
+                            {
+                                label: 'Kelembapan (%)',
+                                data: [],
+                                borderColor: '#60a5fa',
+                                backgroundColor: 'rgba(96, 165, 250, 0.1)',
+                                borderWidth: 2,
+                                tension: 0.4,
+                                fill: true,
+                                yAxisID: 'y1'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: { labels: { color: '#94a3b8' } }
                         },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            interaction: {
-                                mode: 'index',
-                                intersect: false
+                        scales: {
+                            x: {
+                                ticks: { color: '#64748b', maxTicksLimit: 10 },
+                                grid: { color: 'rgba(148, 163, 184, 0.1)' }
                             },
-                            plugins: {
-                                legend: {
-                                    labels: {
-                                        color: '#94a3b8'
-                                    }
-                                }
+                            y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                title: { display: true, text: 'Suhu (°C)', color: '#f87171' },
+                                ticks: { color: '#f87171' },
+                                grid: { color: 'rgba(148, 163, 184, 0.1)' }
                             },
-                            scales: {
-                                x: {
-                                    ticks: {
-                                        color: '#64748b',
-                                        maxTicksLimit: 10
-                                    },
-                                    grid: {
-                                        color: 'rgba(148, 163, 184, 0.1)'
-                                    }
-                                },
-                                y: {
-                                    type: 'linear',
-                                    display: true,
-                                    position: 'left',
-                                    title: {
-                                        display: true,
-                                        text: 'Suhu (°C)',
-                                        color: '#f87171'
-                                    },
-                                    ticks: {
-                                        color: '#f87171'
-                                    },
-                                    grid: {
-                                        color: 'rgba(148, 163, 184, 0.1)'
-                                    }
-                                },
-                                y1: {
-                                    type: 'linear',
-                                    display: true,
-                                    position: 'right',
-                                    title: {
-                                        display: true,
-                                        text: 'Kelembapan (%)',
-                                        color: '#60a5fa'
-                                    },
-                                    ticks: {
-                                        color: '#60a5fa'
-                                    },
-                                    grid: {
-                                        drawOnChartArea: false
-                                    }
-                                }
+                            y1: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                title: { display: true, text: 'Kelembapan (%)', color: '#60a5fa' },
+                                ticks: { color: '#60a5fa' },
+                                grid: { drawOnChartArea: false }
                             }
                         }
-                    });
-                },
-
-                updateChart() {
-                    if (this.chart) {
-                        this.chart.data.labels = this.chartData.labels;
-                        this.chart.data.datasets[0].data = this.chartData.temp;
-                        this.chart.data.datasets[1].data = this.chartData.hum;
-                        this.chart.update();
                     }
+                });
+            },
+
+            updateChart() {
+                if (this.chart) {
+                    this.chart.data.labels = [...this.chartData.labels];
+                    this.chart.data.datasets[0].data = [...this.chartData.temp];
+                    this.chart.data.datasets[1].data = [...this.chartData.hum];
+                    this.chart.update('none'); // 'none' untuk animasi lebih cepat
+                    console.log('Chart updated:', this.chartData.labels.length, 'data points');
                 }
             }
         }
-    </script>
+    }
+</script>
 </body>
 
 </html>
