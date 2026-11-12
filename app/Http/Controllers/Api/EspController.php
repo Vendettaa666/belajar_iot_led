@@ -24,6 +24,7 @@ class EspController extends Controller
             'humidity'    => 'required|numeric',
         ]);
 
+        // PENTING: Update last_seen_at agar status online terdeteksi
         $device->update(['last_seen_at' => now()]);
 
         SensorReading::create([
@@ -45,13 +46,12 @@ class EspController extends Controller
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
-        // Ambil 20 data terakhir untuk chart (diurutkan dari lama ke baru)
         $readings = $device->readings()
             ->latest()
             ->take(20)
             ->get()
             ->reverse()
-            ->map(function($r) {
+            ->map(function ($r) {
                 $r->time = $r->created_at->format('H:i:s');
                 return $r;
             });
@@ -60,7 +60,7 @@ class EspController extends Controller
 
         return response()->json([
             'device_name' => $device->name,
-            'is_online'   => $device->last_seen_at && $device->last_seen_at->gt(now()->subSeconds(60)),
+            'is_online'   => $device->is_online, // PASTIKAN BARIS INI ADA
             'latest'      => $latest ? [
                 'temperature' => (float) $latest->temperature,
                 'humidity'    => (float) $latest->humidity,
@@ -69,7 +69,6 @@ class EspController extends Controller
             'history'     => $readings,
         ]);
     }
-
     private function authenticateDevice(Request $request)
     {
         $apiKey = $request->header('X-API-KEY') ?? $request->input('api_key');

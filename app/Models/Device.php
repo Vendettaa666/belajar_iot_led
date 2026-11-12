@@ -29,6 +29,13 @@ class Device extends Model
     // Accessor untuk mengecek apakah device online (dalam 30 detik terakhir)
     public function getIsOnlineAttribute(): bool
     {
-        return $this->last_seen_at && $this->last_seen_at->gt(now()->subSeconds(30));
+        // Jika last_seen_at null, pasti offline
+        if (!$this->last_seen_at) {
+            return false;
+        }
+
+        // Cek apakah last_seen_at dalam 60 detik terakhir (lebih longgar)
+        // Gunakan Carbon untuk perbandingan yang akurat
+        return $this->last_seen_at->diffInSeconds(now()) < 60;
     }
-}
+    }
