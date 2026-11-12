@@ -9,6 +9,7 @@ class SensorReading extends Model
     public $timestamps = false;
 
     protected $guarded = [];
+    const UPDATED_AT = null; 
 
     protected $casts = [
         'temperature' => 'float',

@@ -3,244 +3,206 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart IoT Dashboard - Polije</title>
+    <title>Monitoring DHT11 - IoT Polije</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
-        .glass {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        .glow-yellow { box-shadow: 0 0 20px rgba(250, 204, 21, 0.4); }
+        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
         [x-cloak] { display: none !important; }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen"
-      x-data='iotDashboard(@json($device), @json($recentLogs), @json($stats))'
-      x-init="startAutoRefresh()">
+<body class="bg-slate-900 text-slate-100 min-h-screen" x-data="sensorDashboard('{{ $apiKey }}')" x-init="init()">
 
     <div class="flex flex-col md:flex-row min-h-screen">
-        <!-- Sidebar -->
+        <!-- Sidebar Sederhana -->
         <aside class="w-full md:w-64 glass border-r border-slate-700/50 p-6 flex flex-col">
             <div class="flex items-center gap-3 mb-10">
                 <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
-                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                 </div>
                 <div>
-                    <h1 class="font-bold text-lg tracking-wide">ESP8266 IoT</h1>
-                    <p class="text-xs text-slate-400">Smart Home v2.0</p>
+                    <h1 class="font-bold text-lg tracking-wide">IoT Sensor</h1>
+                    <p class="text-xs text-slate-400">DHT11 Monitor</p>
                 </div>
             </div>
 
-            <nav class="space-y-2 flex-1">
-                <div class="pt-4 pb-2 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Quick Scenes</div>
-                <button @click="applyScene('all_on')" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800/50 rounded-xl transition">
-                    <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                    Semua Nyala
-                </button>
-                <button @click="applyScene('all_off')" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800/50 rounded-xl transition">
-                    <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
-                    Semua Mati
-                </button>
-                <button @click="applyScene('reading_mode')" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800/50 rounded-xl transition">
-                    <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
-                    Mode Baca
-                </button>
-                <button @click="applyScene('sleep_mode')" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800/50 rounded-xl transition">
-                    <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
-                    Mode Tidur
-                </button>
-            </nav>
-
             <div class="mt-auto pt-6 border-t border-slate-700/50">
                 <div class="flex items-center gap-3">
-                    <div class="w-2 h-2 rounded-full" :class="device.is_online ? 'bg-green-500 animate-pulse' : 'bg-red-500'"></div>
-                    <span class="text-sm font-medium" x-text="device.is_online ? 'Perangkat Online' : 'Perangkat Offline'"></span>
+                    <div class="w-2 h-2 rounded-full" :class="isOnline ? 'bg-green-500 animate-pulse' : 'bg-red-500'"></div>
+                    <span class="text-sm font-medium" x-text="isOnline ? 'Sensor Online' : 'Sensor Offline'"></span>
                 </div>
+                <p class="text-xs text-slate-500 mt-2" x-text="lastUpdate"></p>
             </div>
         </aside>
 
         <!-- Main Content -->
         <main class="flex-1 p-4 md:p-8 overflow-y-auto">
-            <!-- Header Stats -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                <div class="glass rounded-2xl p-6 flex items-center justify-between">
-                    <div>
-                        <p class="text-slate-400 text-sm mb-1">Total LED</p>
-                        <h3 class="text-3xl font-bold" x-text="stats.total_leds"></h3>
-                    </div>
-                    <div class="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
-                    </div>
-                </div>
-                <div class="glass rounded-2xl p-6 flex items-center justify-between">
-                    <div>
-                        <p class="text-slate-400 text-sm mb-1">Sedang Aktif</p>
-                        <h3 class="text-3xl font-bold text-yellow-400" x-text="stats.active_leds"></h3>
-                    </div>
-                    <div class="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-400">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                    </div>
-                </div>
-                <div class="glass rounded-2xl p-6 flex items-center justify-between">
-                    <div>
-                        <p class="text-slate-400 text-sm mb-1">Log Hari Ini</p>
-                        <h3 class="text-3xl font-bold text-cyan-400" x-text="stats.logs_today"></h3>
-                    </div>
-                    <div class="w-12 h-12 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-                    </div>
-                </div>
-            </div>
-
-            <!-- LED Grid -->
-            <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
-                <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
-                Kontrol Perangkat
-            </h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <template x-for="led in device.leds" :key="led.id">
-                    <div class="glass rounded-2xl p-5 transition-all duration-300 relative overflow-hidden"
-                         :class="led.is_on ? 'border-yellow-500/30 glow-yellow' : 'border-slate-700/50'">
-
-                        <div class="flex justify-between items-start mb-6">
+            <!-- Status Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <!-- Temperature Card -->
+                <div class="glass rounded-2xl p-6 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/10 rounded-full -mr-16 -mt-16"></div>
+                    <div class="relative">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center text-red-400">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"></path></svg>
+                            </div>
                             <div>
-                                <h3 class="font-bold text-lg" x-text="led.name"></h3>
-                                <p class="text-xs text-slate-400 mt-1">GPIO <span class="font-mono text-slate-300" x-text="led.gpio_pin"></span></p>
-                            </div>
-                            <div class="w-10 h-10 rounded-full transition-all duration-300 flex items-center justify-center"
-                                 :class="led.is_on ? 'bg-yellow-400 text-slate-900 glow-yellow' : 'bg-slate-800 text-slate-600'">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+                                <p class="text-slate-400 text-sm">Suhu Ruangan</p>
+                                <h3 class="text-4xl font-bold text-red-400"><span x-text="latestTemp"></span>°C</h3>
                             </div>
                         </div>
-
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm font-medium" :class="led.is_on ? 'text-yellow-400' : 'text-slate-500'" x-text="led.is_on ? 'Menyala' : 'Mati'"></span>
-
-                            <button @click="toggleLed(led)" :disabled="loading"
-                                    class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none"
-                                    :class="led.target_on ? 'bg-blue-600' : 'bg-slate-700'">
-                                <span class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-sm"
-                                      :class="led.target_on ? 'translate-x-6' : 'translate-x-1'"></span>
-                            </button>
-                        </div>
-
-                        <div x-show="led.target_on !== led.is_on" x-transition class="absolute bottom-0 left-0 right-0 bg-blue-600/20 text-blue-400 text-[10px] text-center py-1 backdrop-blur-sm">
-                            ⏳ Sinkronisasi...
+                        <div class="flex items-center gap-2 text-xs text-slate-500">
+                            <span>Min: <span class="text-slate-300" x-text="minTemp"></span>°C</span>
+                            <span class="mx-2">•</span>
+                            <span>Max: <span class="text-slate-300" x-text="maxTemp"></span>°C</span>
+                            <span class="mx-2">•</span>
+                            <span>Avg: <span class="text-slate-300" x-text="avgTemp"></span>°C</span>
                         </div>
                     </div>
-                </template>
+                </div>
+
+                <!-- Humidity Card -->
+                <div class="glass rounded-2xl p-6 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full -mr-16 -mt-16"></div>
+                    <div class="relative">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                            </div>
+                            <div>
+                                <p class="text-slate-400 text-sm">Kelembapan Udara</p>
+                                <h3 class="text-4xl font-bold text-blue-400"><span x-text="latestHum"></span>%</h3>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 text-xs text-slate-500">
+                            <span>Min: <span class="text-slate-300" x-text="minHum"></span>%</span>
+                            <span class="mx-2">•</span>
+                            <span>Max: <span class="text-slate-300" x-text="maxHum"></span>%</span>
+                            <span class="mx-2">•</span>
+                            <span>Avg: <span class="text-slate-300" x-text="avgHum"></span>%</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <!-- Activity Log -->
-            <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
-                <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                Riwayat Aktivitas Terkini
-            </h2>
-            <div class="glass rounded-2xl p-6">
-                <div class="space-y-4">
-                    <template x-for="log in recentLogs" :key="log.id">
-                        <div class="flex items-center gap-4 pb-4 border-b border-slate-700/50 last:border-0 last:pb-0">
-                            <div class="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-                                 :class="log.is_on ? 'bg-yellow-500/20 text-yellow-400' : 'bg-slate-700/50 text-slate-400'">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                            </div>
-                            <div class="flex-1">
-                                <p class="text-sm font-medium">
-                                    <span class="text-slate-200" x-text="log.led.name"></span>
-                                    <span class="mx-2 text-slate-600">•</span>
-                                    <span :class="log.is_on ? 'text-yellow-400' : 'text-slate-400'" x-text="log.is_on ? 'Dinyalakan' : 'Dimatikan'"></span>
-                                </p>
-                                <p class="text-xs text-slate-500 mt-1">
-                                    Sumber: <span class="uppercase font-mono" x-text="log.source"></span>
-                                </p>
-                            </div>
-                            <div class="text-xs text-slate-400 text-right" x-text="log.time_ago"></div>
-                        </div>
-                    </template>
+            <!-- Chart -->
+            <div class="glass rounded-2xl p-6 mb-8">
+                <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
+                    Grafik Real-time (20 Data Terakhir)
+                </h2>
+                <div class="relative h-64 md:h-80">
+                    <canvas id="sensorChart"></canvas>
                 </div>
+            </div>
+
+            <!-- Info Box -->
+            <div class="glass rounded-2xl p-6">
+                <h3 class="font-bold text-lg mb-3 text-cyan-400">ℹ️ Status Kenyamanan Ruangan</h3>
+                <p class="text-slate-300" x-text="getComfortStatus()"></p>
             </div>
         </main>
     </div>
 
     <script>
-        function iotDashboard(initialDevice, initialLogs, initialStats) {
+        function sensorDashboard(apiKey) {
             return {
-                device: initialDevice,
-                recentLogs: initialLogs,
-                stats: initialStats,
-                loading: false,
+                latestTemp: '--', latestHum: '--',
+                minTemp: '--', maxTemp: '--', avgTemp: '--',
+                minHum: '--', maxHum: '--', avgHum: '--',
+                isOnline: false, lastUpdate: 'Menunggu data...',
+                chart: null,
+                chartData: { labels: [], temp: [], hum: [] },
 
-                // FUNGSI AJAX BARU: Update tanpa reload halaman
+                async init() {
+                    this.initChart();
+                    await this.fetchData();
+                    setInterval(() => this.fetchData(), 10000);
+                },
+
                 async fetchData() {
                     try {
-                        const response = await fetch('{{ route("dashboard.data") }}');
+                        const response = await fetch(`/api/esp/sensor/latest?api_key=${apiKey}`);
                         const data = await response.json();
 
-                        this.device = data.device;
-                        this.stats = data.stats;
-                        this.recentLogs = data.recentLogs;
-                    } catch (error) {
-                        console.error('Gagal update data:', error);
-                    }
-                },
+                        if (data.latest) {
+                            this.latestTemp = data.latest.temperature;
+                            this.latestHum = data.latest.humidity;
+                            this.lastUpdate = 'Update: ' + data.latest.time;
+                            this.isOnline = data.is_online;
 
-                async toggleLed(led) {
-                    const previousTarget = led.target_on;
-                    led.target_on = !previousTarget;
-                    this.loading = true;
+                            this.chartData.labels.push(data.latest.time);
+                            this.chartData.temp.push(data.latest.temperature);
+                            this.chartData.hum.push(data.latest.humidity);
 
-                    try {
-                        const response = await fetch(`/dashboard/led/${led.id}/toggle`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                            },
-                            body: JSON.stringify({ target_on: led.target_on })
-                        });
-                        const result = await response.json();
-                        if (!result.success) led.target_on = previousTarget;
-                    } catch (error) {
-                        led.target_on = previousTarget;
-                    } finally {
-                        this.loading = false;
-                    }
-                },
-
-                async applyScene(sceneName) {
-                    this.loading = true;
-                    try {
-                        const response = await fetch('/dashboard/scene', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                            },
-                            body: JSON.stringify({ scene: sceneName })
-                        });
-                        const result = await response.json();
-                        if(result.success) {
-                            // Langsung update data setelah scene diterapkan
-                            await this.fetchData();
+                            if (this.chartData.labels.length > 20) {
+                                this.chartData.labels.shift();
+                                this.chartData.temp.shift();
+                                this.chartData.hum.shift();
+                            }
+                            this.calculateStats();
+                            this.updateChart();
+                        } else {
+                            this.isOnline = false;
                         }
                     } catch (error) {
-                        console.error('Scene error:', error);
-                    } finally {
-                        this.loading = false;
+                        console.error('Gagal fetch data:', error);
+                        this.isOnline = false;
                     }
                 },
 
-                startAutoRefresh() {
-                    // Update UI setiap 1.5 detik secara mulus (tanpa reload)
-                    setInterval(() => {
-                        this.fetchData();
-                    }, 1500);
+                calculateStats() {
+                    if (this.chartData.temp.length === 0) return;
+                    const t = this.chartData.temp, h = this.chartData.hum;
+                    this.minTemp = Math.min(...t).toFixed(1); this.maxTemp = Math.max(...t).toFixed(1);
+                    this.avgTemp = (t.reduce((a, b) => a + b, 0) / t.length).toFixed(1);
+                    this.minHum = Math.min(...h).toFixed(1); this.maxHum = Math.max(...h).toFixed(1);
+                    this.avgHum = (h.reduce((a, b) => a + b, 0) / h.length).toFixed(1);
+                },
+
+                getComfortStatus() {
+                    const t = parseFloat(this.latestTemp), h = parseFloat(this.latestHum);
+                    if (isNaN(t) || isNaN(h)) return 'Menunggu data dari sensor...';
+                    if (t >= 20 && t <= 26 && h >= 40 && h <= 60) return '✅ Nyaman - Kondisi ideal ruangan.';
+                    if (t > 26) return '🌡️ Terlalu panas - Pertimbangkan untuk menyalakan kipas/AC.';
+                    if (t < 20) return '❄️ Terlalu dingin.';
+                    if (h > 60) return '💧 Terlalu lembap - Risiko tumbuhnya jamur.';
+                    return '🌬️ Udara terlalu kering.';
+                },
+
+                initChart() {
+                    const ctx = document.getElementById('sensorChart').getContext('2d');
+                    this.chart = new Chart(ctx, {
+                        type: 'line',
+                        data: { labels: [], datasets: [
+                            { label: 'Suhu (°C)', data: [], borderColor: '#f87171', backgroundColor: 'rgba(248, 113, 113, 0.1)', borderWidth: 2, tension: 0.4, fill: true, yAxisID: 'y' },
+                            { label: 'Kelembapan (%)', data: [], borderColor: '#60a5fa', backgroundColor: 'rgba(96, 165, 250, 0.1)', borderWidth: 2, tension: 0.4, fill: true, yAxisID: 'y1' }
+                        ]},
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            interaction: { mode: 'index', intersect: false },
+                            plugins: { legend: { labels: { color: '#94a3b8' } } },
+                            scales: {
+                                x: { ticks: { color: '#64748b', maxTicksLimit: 10 }, grid: { color: 'rgba(148, 163, 184, 0.1)' } },
+                                y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Suhu (°C)', color: '#f87171' }, ticks: { color: '#f87171' }, grid: { color: 'rgba(148, 163, 184, 0.1)' } },
+                                y1: { type: 'linear', display: true, position: 'right', title: { display: true, text: 'Kelembapan (%)', color: '#60a5fa' }, ticks: { color: '#60a5fa' }, grid: { drawOnChartArea: false } }
+                            }
+                        }
+                    });
+                },
+
+                updateChart() {
+                    if (this.chart) {
+                        this.chart.data.labels = this.chartData.labels;
+                        this.chart.data.datasets[0].data = this.chartData.temp;
+                        this.chart.data.datasets[1].data = this.chartData.hum;
+                        this.chart.update();
+                    }
                 }
             }
         }
